@@ -1,0 +1,6 @@
+# Perfil de produção: logs em JSON (ver logback-spring.xml).
+# Variáveis esperadas: DB_URL, DB_USER, DB_PASSWORD, JWT_SECRET
+management:
+  endpoint:
+    health:
+      show-details: never

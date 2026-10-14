@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:16
+    container_name: datalume-db
+    environment:
+      POSTGRES_DB: datalume
+      POSTGRES_USER: datalume
+      POSTGRES_PASSWORD: datalume
+    ports:
+      - "5432:5432"
+    volumes:
+      - datalume-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U datalume -d datalume"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  datalume-pgdata:

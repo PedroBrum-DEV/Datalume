@@ -1,0 +1,2 @@
+# Fixa o Amazon Corretto 17. Uso: `sdk env install` (1a vez) e `sdk env`.
+java=17.0.13-amzn

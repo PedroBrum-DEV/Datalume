@@ -1,0 +1,8 @@
+# Perfil de desenvolvimento. NÃO use este segredo fora da sua máquina.
+datalume:
+  seguranca:
+    jwt-secret: local-dev-secret-troque-em-producao-0123456789abcdef
+
+logging:
+  level:
+    br.com.datalume: DEBUG
