@@ -82,7 +82,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <scope>runtime</scope>
+      <!-- escopo compile: a importação usa a API de COPY do driver (PGConnection) -->
     </dependency>
 
     <dependency>

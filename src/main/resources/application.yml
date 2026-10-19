@@ -73,3 +73,20 @@ datalume:
     # true => na subida, carrega municípios (IBGE) e CNAEs se as tabelas estiverem vazias
     carga-inicial: ${DATALUME_REFERENCIA_CARGA_INICIAL:false}
     ibge-url: https://servicodados.ibge.gov.br/api
+
+  importacao:
+    # Diretório da Receita com as pastas AAAA-MM (Estabelecimentos0.zip ... Empresas9.zip etc.)
+    base-url: https://arquivos.receitafederal.gov.br/dados/cnpj/dados_abertos_cnpj
+    diretorio: ${DATALUME_IMPORTACAO_DIRETORIO:./dados/receita}
+    partes: 10
+    apagar-zip-apos-importar: true
+    tentativas-download: 5
+    meses-busca: 6
+    recuperar-interrompidos: true
+    # Só entra no banco o que casar com o filtro. Vazio = Brasil inteiro (dezenas de milhões de linhas).
+    filtro:
+      ufs: ${DATALUME_IMPORTACAO_UFS:}
+      cnae-prefixos: ${DATALUME_IMPORTACAO_CNAES:}
+    agendamento:
+      habilitado: ${DATALUME_IMPORTACAO_AGENDADA:false}
+      cron: "0 0 3 * * *"

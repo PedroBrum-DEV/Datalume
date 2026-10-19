@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Ordem recomendada: municípios IBGE -> CNAEs -> municípios da Receita -> (opcional) tabela de conversão.
  */
 @Service
-class CargaReferenciaService {
+public class CargaReferenciaService {
 
     private static final Logger log = LoggerFactory.getLogger(CargaReferenciaService.class);
 
@@ -109,7 +109,7 @@ class CargaReferenciaService {
      * e são resolvidos por nome + UF em {@link ReferenciaConsulta#municipioIbgeDaReceita}.
      */
     @Transactional
-    ResultadoCarga importarMunicipiosReceita(InputStream entrada, Charset charset) {
+    public ResultadoCarga importarMunicipiosReceita(InputStream entrada, Charset charset) {
         int processados = 0;
         int ignorados = 0;
         for (List<String> campos : lerCsv(entrada, charset)) {

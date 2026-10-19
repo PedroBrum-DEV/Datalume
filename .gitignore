@@ -6,3 +6,4 @@ target/
 *.log
 .env
 /dados/
+.backup-importacao/

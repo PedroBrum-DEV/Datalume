@@ -11,7 +11,7 @@ Fonte principal: base de CNPJ da Receita Federal (arquivos mensais). PNCP entra 
 |---|---|
 | 0 — Preparação | Infra pronta; itens de validação externa e decisão de negócio em [docs/fase-0](docs/fase-0/00-checklist.md) |
 | Fundação | Implementada (ver abaixo) |
-| 2 — Importação da Receita | Não iniciada (`importacao` e `estabelecimento` são módulos vazios) |
+| Importação da Receita | Implementada ([docs/importacao.md](docs/importacao.md)) |
 
 ## Subir localmente
 
@@ -46,7 +46,7 @@ curl -s localhost:8080/actuator/health
 
 - **Módulos (Spring Modulith)**: `conta`, `referencia`, `importacao`, `estabelecimento`, `busca`, `monitor`, `alerta`
   + `compartilhado` (aberto). Dependências permitidas declaradas em cada `package-info.java` e verificadas por
-  `ModularityTests`. `importacao`, `estabelecimento`, `busca`, `monitor` e `alerta` têm só um marcador
+  `ModularityTests`. `busca`, `monitor` e `alerta` têm só um marcador
   (`XxxModulo`) para existirem como módulo; apague-o ao criar a primeira classe real.
 - **Flyway**: `V1__schema_inicial.sql` (conta, usuário, plano, referência) e `V2__dados_basicos.sql` (3 planos + 27 UFs).
 - **Referência**: UFs, municípios IBGE, CNAEs (subclasses) e conversão município Receita→IBGE
@@ -64,6 +64,16 @@ curl -s localhost:8080/actuator/health
 - [ ] `GET /api/admin/referencia/resumo` mostra 27 UFs, ~5.570 municípios e ~1.300 subclasses CNAE
 - [ ] Cadastro, login e `/api/conta/me` funcionam; `/actuator/health` responde `UP`
 
+## Importação da Receita
+
+Download com retomada, carga via `COPY`, consolidação idempotente e consulta por CNPJ. Detalhes, filtros e
+operação em [docs/importacao.md](docs/importacao.md).
+
+```bash
+curl -s -X POST localhost:8080/api/admin/importacao -H "Authorization: Bearer $TOKEN"     # admin da plataforma
+curl -s localhost:8080/api/estabelecimentos/11222333000181 -H "Authorization: Bearer $TOKEN"
+```
+
 ## Ainda não incluído (de propósito)
 
 Refresh token e logout/revogação, recuperação de senha, verificação de e-mail, limite de tentativas de login,
@@ -76,6 +86,8 @@ src/main/java/br/com/datalume/
   compartilhado/   erros (ProblemDetail), RequestIdFilter, utilitários
   conta/           entidades, JWT/Security, cadastro e login; API pública: ContaAtual
   referencia/      consultas (ReferenciaConsulta) e carga (internal)
-  importacao/ estabelecimento/ busca/ monitor/ alerta/   (Fases 2+)
+  estabelecimento/ empresas e estabelecimentos: carga em massa, consulta por CNPJ
+  importacao/      download, controle de lotes e agendamento
+  busca/ monitor/ alerta/   (próximas etapas)
 docs/fase-0/  docs/
 ```

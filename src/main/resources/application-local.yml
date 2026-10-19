@@ -2,6 +2,12 @@
 datalume:
   seguranca:
     jwt-secret: local-dev-secret-troque-em-producao-0123456789abcdef
+  importacao:
+    # Em desenvolvimento importa só o piloto: SP + clínicas odontológicas e distribuidoras de bebidas.
+    # Para o Brasil inteiro, defina DATALUME_IMPORTACAO_UFS= e DATALUME_IMPORTACAO_CNAES= vazios.
+    filtro:
+      ufs: ${DATALUME_IMPORTACAO_UFS:SP}
+      cnae-prefixos: ${DATALUME_IMPORTACAO_CNAES:8630504,4635401,4635402,4635403,4635499}
 
 logging:
   level:
