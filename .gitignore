@@ -7,3 +7,4 @@ target/
 .env
 /dados/
 .backup-importacao/
+.backup-busca/

@@ -30,6 +30,9 @@ public class Plano {
     @Column(name = "limite_alertas", nullable = false)
     private int limiteAlertas;
 
+    @Column(name = "limite_exportacao", nullable = false)
+    private int limiteExportacao;
+
     @Column(nullable = false)
     private boolean ativo = true;
 
@@ -58,6 +61,10 @@ public class Plano {
 
     public int getLimiteAlertas() {
         return limiteAlertas;
+    }
+
+    public int getLimiteExportacao() {
+        return limiteExportacao;
     }
 
     public boolean isAtivo() {

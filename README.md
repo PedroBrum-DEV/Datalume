@@ -12,6 +12,7 @@ Fonte principal: base de CNPJ da Receita Federal (arquivos mensais). PNCP entra 
 | 0 — Preparação | Infra pronta; itens de validação externa e decisão de negócio em [docs/fase-0](docs/fase-0/00-checklist.md) |
 | Fundação | Implementada (ver abaixo) |
 | Importação da Receita | Implementada ([docs/importacao.md](docs/importacao.md)) |
+| Busca por nicho e região | Implementada ([docs/busca.md](docs/busca.md)) |
 
 ## Subir localmente
 
@@ -46,7 +47,7 @@ curl -s localhost:8080/actuator/health
 
 - **Módulos (Spring Modulith)**: `conta`, `referencia`, `importacao`, `estabelecimento`, `busca`, `monitor`, `alerta`
   + `compartilhado` (aberto). Dependências permitidas declaradas em cada `package-info.java` e verificadas por
-  `ModularityTests`. `busca`, `monitor` e `alerta` têm só um marcador
+  `ModularityTests`. `monitor` e `alerta` têm só um marcador
   (`XxxModulo`) para existirem como módulo; apague-o ao criar a primeira classe real.
 - **Flyway**: `V1__schema_inicial.sql` (conta, usuário, plano, referência) e `V2__dados_basicos.sql` (3 planos + 27 UFs).
 - **Referência**: UFs, municípios IBGE, CNAEs (subclasses) e conversão município Receita→IBGE
@@ -74,6 +75,15 @@ curl -s -X POST localhost:8080/api/admin/importacao -H "Authorization: Bearer $T
 curl -s localhost:8080/api/estabelecimentos/11222333000181 -H "Authorization: Bearer $TOKEN"
 ```
 
+## Busca por nicho e região
+
+Pesquisa por CNAE e região, facetas, nichos salvos por conta e exportação CSV com limite por plano.
+Detalhes, parâmetros e como medir desempenho em [docs/busca.md](docs/busca.md).
+
+```bash
+curl -s "localhost:8080/api/busca/estabelecimentos?cnae=8630504&uf=SP&limite=20" -H "Authorization: Bearer $TOKEN"
+```
+
 ## Ainda não incluído (de propósito)
 
 Refresh token e logout/revogação, recuperação de senha, verificação de e-mail, limite de tentativas de login,
@@ -88,6 +98,7 @@ src/main/java/br/com/datalume/
   referencia/      consultas (ReferenciaConsulta) e carga (internal)
   estabelecimento/ empresas e estabelecimentos: carga em massa, consulta por CNPJ
   importacao/      download, controle de lotes e agendamento
-  busca/ monitor/ alerta/   (próximas etapas)
-docs/fase-0/  docs/
+  busca/           nichos por conta, pesquisa, facetas e exportação CSV
+  monitor/ alerta/ (próximas etapas)
+docs/fase-0/  docs/  scripts/sinteticos/
 ```
