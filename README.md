@@ -13,6 +13,7 @@ Fonte principal: base de CNPJ da Receita Federal (arquivos mensais). PNCP entra 
 | Fundação | Implementada (ver abaixo) |
 | Importação da Receita | Implementada ([docs/importacao.md](docs/importacao.md)) |
 | Busca por nicho e região | Implementada ([docs/busca.md](docs/busca.md)) |
+| Monitor e alertas | Implementado ([docs/monitor.md](docs/monitor.md)) |
 
 ## Subir localmente
 
@@ -47,8 +48,7 @@ curl -s localhost:8080/actuator/health
 
 - **Módulos (Spring Modulith)**: `conta`, `referencia`, `importacao`, `estabelecimento`, `busca`, `monitor`, `alerta`
   + `compartilhado` (aberto). Dependências permitidas declaradas em cada `package-info.java` e verificadas por
-  `ModularityTests`. `monitor` e `alerta` têm só um marcador
-  (`XxxModulo`) para existirem como módulo; apague-o ao criar a primeira classe real.
+  `ModularityTests`.
 - **Flyway**: `V1__schema_inicial.sql` (conta, usuário, plano, referência) e `V2__dados_basicos.sql` (3 planos + 27 UFs).
 - **Referência**: UFs, municípios IBGE, CNAEs (subclasses) e conversão município Receita→IBGE
   ([detalhes](docs/referencia.md)). Municípios e CNAEs são carregados da API do IBGE (a app precisa de internet na carga).
@@ -84,6 +84,18 @@ Detalhes, parâmetros e como medir desempenho em [docs/busca.md](docs/busca.md).
 curl -s "localhost:8080/api/busca/estabelecimentos?cnae=8630504&uf=SP&limite=20" -H "Authorization: Bearer $TOKEN"
 ```
 
+## Monitor e alertas
+
+Detecta aberturas, baixas e mudanças de situação, endereço e CNAE entre uma importação e a seguinte, e avisa por
+e-mail (resumo mensal) e por um feed na API. Veja [docs/monitor.md](docs/monitor.md). Em desenvolvimento os e-mails
+caem no Mailpit: http://localhost:8025.
+
+```bash
+curl -s -X PUT localhost:8080/api/nichos/$NICHO/monitoramento -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d '{"tipos":["ABERTURA","BAIXA"]}'
+curl -s localhost:8080/api/alertas -H "Authorization: Bearer $TOKEN"
+```
+
 ## Ainda não incluído (de propósito)
 
 Refresh token e logout/revogação, recuperação de senha, verificação de e-mail, limite de tentativas de login,
@@ -99,6 +111,7 @@ src/main/java/br/com/datalume/
   estabelecimento/ empresas e estabelecimentos: carga em massa, consulta por CNPJ
   importacao/      download, controle de lotes e agendamento
   busca/           nichos por conta, pesquisa, facetas e exportação CSV
-  monitor/ alerta/ (próximas etapas)
+  monitor/         mudanças por nicho e regras de monitoramento
+  alerta/          feed, preferências e e-mails
 docs/fase-0/  docs/  scripts/sinteticos/
 ```

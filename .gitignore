@@ -8,3 +8,4 @@ target/
 /dados/
 .backup-importacao/
 .backup-busca/
+.backup-monitor/

@@ -5,6 +5,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
@@ -21,6 +23,9 @@ import org.springframework.stereotype.Component;
 public class EstabelecimentoCarga {
 
     private static final Pattern REFERENCIA = Pattern.compile("\\d{4}-(0[1-9]|1[0-2])");
+
+    /** Uma empresa nova só vira evento de ABERTURA se começou a atividade nos últimos N dias da referência. */
+    public static final int JANELA_ABERTURA_DIAS = 90;
 
     public enum Destino {
         ESTABELECIMENTO("stg_estabelecimento"),
@@ -56,15 +61,38 @@ public class EstabelecimentoCarga {
 
     public Resultado consolidar(Connection conexao, Destino destino, String referencia, FiltroImportacao filtro)
             throws SQLException {
+        return consolidar(conexao, destino, referencia, filtro, false);
+    }
+
+    /**
+     * @param gerarEventos grava em estabelecimento_evento as mudanças em relação ao estado atual (ABERTURA, BAIXA,
+     *                     SITUACAO, MUDANCA_ENDERECO, MUDANCA_CNAE). Deve ser falso na primeira carga.
+     */
+    public Resultado consolidar(Connection conexao, Destino destino, String referencia, FiltroImportacao filtro,
+            boolean gerarEventos) throws SQLException {
         if (!REFERENCIA.matcher(referencia).matches()) {
             throw new IllegalArgumentException("Referência inválida: " + referencia);
         }
         return switch (destino) {
-            case ESTABELECIMENTO -> executar(conexao, sqlEstabelecimento(filtro), referencia);
+            case ESTABELECIMENTO -> executarEstabelecimento(conexao, sqlEstabelecimento(filtro), referencia, gerarEventos);
             case EMPRESA -> executar(conexao, SQL_EMPRESA, referencia);
             case NATUREZA_JURIDICA -> executar(conexao, sqlCodigos("natureza_juridica", 4), null);
             case MOTIVO_SITUACAO -> executar(conexao, sqlCodigos("motivo_situacao", 2), null);
         };
+    }
+
+    private Resultado executarEstabelecimento(Connection conexao, String sql, String referencia, boolean gerarEventos)
+            throws SQLException {
+        LocalDate fimDaReferencia = YearMonth.parse(referencia).plusMonths(1).atDay(1);
+        try (PreparedStatement ps = conexao.prepareStatement(sql)) {
+            ps.setString(1, referencia);
+            ps.setDate(2, java.sql.Date.valueOf(fimDaReferencia.minusDays(JANELA_ABERTURA_DIAS)));
+            ps.setBoolean(3, gerarEventos);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return new Resultado(rs.getLong("inseridos"), rs.getLong("atualizados"));
+            }
+        }
     }
 
     private Resultado executar(Connection conexao, String sql, String referencia) throws SQLException {
@@ -102,7 +130,9 @@ public class EstabelecimentoCarga {
 
     private static String sqlEstabelecimento(FiltroImportacao filtro) {
         return """
-                WITH fonte AS (
+                WITH par AS (
+                    SELECT CAST(? AS varchar) AS ref, CAST(? AS date) AS min_abertura, CAST(? AS boolean) AS gerar
+                ), fonte AS (
                     SELECT
                         lpad(btrim(c01), 8, '0')                        AS cnpj_basico,
                         lpad(btrim(c02), 4, '0')                        AS cnpj_ordem,
@@ -150,6 +180,29 @@ public class EstabelecimentoCarga {
                     SELECT DISTINCT ON (c.cnpj) c.*, md5(c::text) AS row_hash
                     FROM calc c
                     ORDER BY c.cnpj
+                ), ev AS (
+                    INSERT INTO estabelecimento_evento (cnpj, referencia, tipo, situacao_antes, situacao_depois,
+                        cnae_antes, cnae_depois, uf_antes, uf_depois, municipio_antes, municipio_depois)
+                    SELECT u.cnpj, p.ref, t.tipo, o.situacao_cadastral, u.situacao_cadastral,
+                           o.cnae_principal, u.cnae_principal, o.uf, u.uf, o.municipio_ibge, u.municipio_ibge
+                    FROM unico u
+                    CROSS JOIN par p
+                    LEFT JOIN estabelecimento o ON o.cnpj = u.cnpj
+                    CROSS JOIN LATERAL (VALUES
+                        ('ABERTURA', o.cnpj IS NULL AND u.situacao_cadastral = '02'
+                                     AND u.data_inicio_atividade >= p.min_abertura),
+                        ('BAIXA', o.cnpj IS NOT NULL AND u.situacao_cadastral = '08'
+                                  AND o.situacao_cadastral IS DISTINCT FROM '08'),
+                        ('SITUACAO', o.cnpj IS NOT NULL AND u.situacao_cadastral IS DISTINCT FROM o.situacao_cadastral
+                                     AND u.situacao_cadastral IS DISTINCT FROM '08'),
+                        ('MUDANCA_ENDERECO', o.cnpj IS NOT NULL AND (
+                                     (u.uf <> o.uf) OR (u.municipio_receita <> o.municipio_receita) OR (u.cep <> o.cep))),
+                        ('MUDANCA_CNAE', o.cnpj IS NOT NULL AND u.cnae_principal IS DISTINCT FROM o.cnae_principal)
+                    ) AS t(tipo, ocorreu)
+                    WHERE p.gerar AND t.ocorreu
+                      AND (o.cnpj IS NULL OR o.row_hash IS DISTINCT FROM u.row_hash)
+                    ON CONFLICT (cnpj, referencia, tipo) DO NOTHING
+                    RETURNING 1
                 ), up AS (
                     INSERT INTO estabelecimento AS e (
                         cnpj, cnpj_basico, cnpj_ordem, cnpj_dv, matriz, nome_fantasia, situacao_cadastral,
@@ -162,7 +215,7 @@ public class EstabelecimentoCarga {
                         data_situacao, motivo_situacao, cidade_exterior, pais, data_inicio_atividade,
                         cnae_principal, cnaes_secundarios, tipo_logradouro, logradouro, numero, complemento,
                         bairro, cep, uf, municipio_receita, municipio_ibge, ddd1, telefone1, ddd2, telefone2,
-                        email, ?, row_hash
+                        email, (SELECT ref FROM par), row_hash
                     FROM unico
                     ON CONFLICT (cnpj) DO UPDATE SET
                         matriz = EXCLUDED.matriz,

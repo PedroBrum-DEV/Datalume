@@ -26,6 +26,14 @@ spring:
     time-zone: America/Sao_Paulo
   lifecycle:
     timeout-per-shutdown-phase: 20s
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:1025}
+    username: ${SMTP_USER:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS:false}
   servlet:
     multipart:
       max-file-size: 50MB
@@ -40,6 +48,9 @@ server:
     include-binding-errors: never
 
 management:
+  health:
+    mail:
+      enabled: false
   endpoints:
     web:
       exposure:
@@ -90,3 +101,17 @@ datalume:
     agendamento:
       habilitado: ${DATALUME_IMPORTACAO_AGENDADA:false}
       cron: "0 0 3 * * *"
+  estabelecimento:
+    retencao-eventos-meses: 24
+  monitor:
+    retencao-meses: 24
+    intervalo-pendencias-ms: 600000
+  alerta:
+    url-base: ${DATALUME_URL_BASE:http://localhost:8080}
+    remetente: ${DATALUME_REMETENTE:nao-responder@datalume.com.br}
+    email-habilitado: true
+    # Assina os links de cancelamento. Por padrão reaproveita o segredo do JWT.
+    segredo-links: ${DATALUME_ALERTA_SEGREDO:${datalume.seguranca.jwt-secret}}
+    max-itens-email: 50
+    tentativas-envio: 5
+    intervalo-envio-ms: 60000

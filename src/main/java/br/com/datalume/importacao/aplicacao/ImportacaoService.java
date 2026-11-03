@@ -4,6 +4,7 @@ import br.com.datalume.compartilhado.erro.ConflitoException;
 import br.com.datalume.compartilhado.erro.RecursoNaoEncontradoException;
 import br.com.datalume.compartilhado.erro.RegraDeNegocioException;
 import br.com.datalume.compartilhado.erro.RequisicaoInvalidaException;
+import br.com.datalume.compartilhado.evento.ImportacaoConcluida;
 import br.com.datalume.estabelecimento.EstabelecimentoCarga;
 import br.com.datalume.estabelecimento.EstabelecimentoCarga.Destino;
 import br.com.datalume.importacao.ImportacaoProperties;
@@ -30,6 +31,7 @@ import org.postgresql.PGConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -53,10 +55,11 @@ public class ImportacaoService {
     private final DataSource dataSource;
     private final JdbcTemplate jdbc;
     private final ImportacaoExecutor executor;
+    private final ApplicationEventPublisher eventos;
 
     public ImportacaoService(ImportacaoProperties props, ReceitaClient receita, RepositorioImportacao repo,
             EstabelecimentoCarga carga, ReferenciaManutencao referencia, DataSource dataSource,
-            JdbcTemplate jdbc, ImportacaoExecutor executor) {
+            JdbcTemplate jdbc, ImportacaoExecutor executor, ApplicationEventPublisher eventos) {
         this.props = props;
         this.receita = receita;
         this.repo = repo;
@@ -65,6 +68,7 @@ public class ImportacaoService {
         this.dataSource = dataSource;
         this.jdbc = jdbc;
         this.executor = executor;
+        this.eventos = eventos;
     }
 
     // ------------------------------------------------------------------ consultas
@@ -148,12 +152,14 @@ public class ImportacaoService {
         MDC.put("loteId", String.valueOf(loteId));
         try {
             Lote lote = lote(loteId);
+            // só registra mudanças (aberturas, baixas...) se já existe uma referência anterior importada
+            boolean gerarEventos = repo.existeLoteConcluidoDeOutraReferencia(lote.referencia());
             for (ArquivoImportacao arquivo : repo.arquivos(loteId)) {
                 if ("CONCLUIDO".equals(arquivo.status())) {
                     continue;
                 }
                 try {
-                    processar(lote, arquivo);
+                    processar(lote, arquivo, gerarEventos);
                 } catch (Exception e) {
                     if (e instanceof InterruptedException) {
                         Thread.currentThread().interrupt();
@@ -168,6 +174,11 @@ public class ImportacaoService {
             analisarTabelas();
             repo.finalizarLote(loteId, Lote.CONCLUIDO, null);
             log.info("Importação concluída: lote={} referencia={}", loteId, lote.referencia());
+            try {
+                eventos.publishEvent(new ImportacaoConcluida(lote.referencia()));
+            } catch (RuntimeException e) {
+                log.error("Falha ao notificar a conclusão da importação (o monitor retoma sozinho)", e);
+            }
         } catch (Throwable t) {
             log.error("Importação interrompida inesperadamente", t);
             repo.finalizarLote(loteId, Lote.FALHOU, resumirErro(t));
@@ -176,7 +187,7 @@ public class ImportacaoService {
         }
     }
 
-    private void processar(Lote lote, ArquivoImportacao arquivo)
+    private void processar(Lote lote, ArquivoImportacao arquivo, boolean gerarEventos)
             throws IOException, InterruptedException, SQLException {
         TipoArquivo tipo = TipoArquivo.valueOf(arquivo.tipo());
         Path zip = Path.of(props.diretorio(), lote.referencia(), arquivo.nome());
@@ -193,7 +204,7 @@ public class ImportacaoService {
             try (InputStream csv = zf.getInputStream(entrada)) {
                 contagem = tipo == TipoArquivo.MUNICIPIOS
                         ? importarMunicipios(csv)
-                        : importarViaCopy(tipo.destino(), csv, lote.referencia());
+                        : importarViaCopy(tipo.destino(), csv, lote.referencia(), gerarEventos);
             }
         } catch (ZipException e) {
             Files.deleteIfExists(zip); // arquivo corrompido: força novo download na retomada
@@ -212,7 +223,7 @@ public class ImportacaoService {
         return new Contagem(n, n, 0);
     }
 
-    private Contagem importarViaCopy(Destino destino, InputStream csv, String ref)
+    private Contagem importarViaCopy(Destino destino, InputStream csv, String ref, boolean gerarEventos)
             throws SQLException, IOException {
         try (Connection c = dataSource.getConnection()) {
             boolean autoCommit = c.getAutoCommit();
@@ -220,7 +231,7 @@ public class ImportacaoService {
             try {
                 carga.prepararStaging(c, destino);
                 long linhas = c.unwrap(PGConnection.class).getCopyAPI().copyIn(carga.comandoCopy(destino), csv);
-                EstabelecimentoCarga.Resultado r = carga.consolidar(c, destino, ref, props.filtroImportacao());
+                EstabelecimentoCarga.Resultado r = carga.consolidar(c, destino, ref, props.filtroImportacao(), gerarEventos);
                 carga.prepararStaging(c, destino); // libera o espaço da área de passagem
                 c.commit();
                 return new Contagem(linhas, r.inseridos(), r.atualizados());

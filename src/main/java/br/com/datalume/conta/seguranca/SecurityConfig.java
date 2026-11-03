@@ -40,6 +40,7 @@ class SecurityConfig {
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/alertas/cancelar").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers("/actuator/**").hasRole("ADMIN_PLATAFORMA")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN_PLATAFORMA")

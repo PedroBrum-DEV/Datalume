@@ -16,5 +16,13 @@ services:
       timeout: 3s
       retries: 10
 
+  # Caixa de e-mail local para desenvolvimento: SMTP em localhost:1025, interface em http://localhost:8025
+  mailpit:
+    image: axllent/mailpit
+    container_name: datalume-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
 volumes:
   datalume-pgdata:

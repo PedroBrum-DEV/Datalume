@@ -90,6 +90,12 @@ public class RepositorioImportacao {
                 .param("r", referencia).query(Boolean.class).single();
     }
 
+    /** Já houve importação concluída de outra referência? Se sim, a atual pode gerar eventos de mudança. */
+    public boolean existeLoteConcluidoDeOutraReferencia(String referencia) {
+        return jdbc.sql("SELECT EXISTS (SELECT 1 FROM importacao_lote WHERE status = 'CONCLUIDO' AND referencia <> :r)")
+                .param("r", referencia).query(Boolean.class).single();
+    }
+
     public List<Lote> listarLotes(int limite) {
         return jdbc.sql("""
                         SELECT id, referencia, status, filtro, erro, criado_em, finalizado_em
